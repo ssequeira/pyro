@@ -185,6 +185,16 @@ class BlockPoutineTests(NormalNormalNormalPoutineTestCase):
                 assert name not in model_trace
                 assert name not in guide_trace
 
+    def test_block_tutorial_case(self):
+        model_trace = poutine.trace(self.model).get_trace()
+        guide_trace = poutine.trace(
+            poutine.block(self.guide, hide_types=["observe"])).get_trace()
+
+        assert "latent1" in model_trace
+        assert "latent1" in guide_trace
+        assert "obs" in model_trace
+        assert "obs" not in guide_trace
+
 
 class QueuePoutineDiscreteTest(TestCase):
 
@@ -422,14 +432,14 @@ class IndirectLambdaPoutineTests(TestCase):
     def setUp(self):
 
         def model(batch_size_outer=2, batch_size_inner=2):
-            mu_latent = pyro.sample("mu_latent", dist.normal, ng_zeros(1), ng_ones(1))
+            mu_latent = pyro.sample("mu_latent", dist.Normal(ng_zeros(1), ng_ones(1)))
 
             def outer(i, x):
                 pyro.map_data("map_inner_%d" % i, x, lambda _i, _x:
                               inner(i, _i, _x), batch_size=batch_size_inner)
 
             def inner(i, _i, _x):
-                pyro.sample("z_%d_%d" % (i, _i), dist.normal, mu_latent + _x, ng_ones(1))
+                pyro.sample("z_%d_%d" % (i, _i), dist.Normal(mu_latent + _x, ng_ones(1)))
 
             pyro.map_data("map_outer", [[ng_ones(1)] * 2] * 2, lambda i, x:
                           outer(i, x), batch_size=batch_size_outer)
